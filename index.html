@@ -1,0 +1,475 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartCell CNC Tending</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#edf1f4;color:#263440;font:14px Arial,sans-serif}
+header{background:#20394c;color:white;padding:16px 22px;display:flex;justify-content:space-between;gap:10px}
+h1{font-size:21px;margin:0}
+header span{font-size:12px;color:#d2dee6}
+main{max-width:1200px;margin:18px auto;padding:0 14px;display:grid;grid-template-columns:1.5fr 1fr;gap:15px}
+.panel{background:white;border:1px solid #cbd4db;border-radius:5px;overflow:hidden}
+.heading{padding:12px 14px;border-bottom:1px solid #d5dce1;font-weight:bold}
+svg{width:100%;display:block}
+.machine{fill:#e4eaee;stroke:#647783;stroke-width:1.5}
+.door{fill:#cbd6dd;stroke:#83929c}
+.label{font-size:13px;fill:#263440;font-weight:bold}
+.small{font-size:11px;fill:#64737f}
+.reach{fill:none;stroke:#94a4af;stroke-dasharray:6 6;stroke-width:1.5}
+.arm{fill:none;stroke:#d48b39;stroke-width:8;stroke-linecap:round}
+.joint{fill:#f0c27c;stroke:#775329;stroke-width:1.5}
+.base{fill:#435c6c;stroke:#20394c;stroke-width:1.5}
+.machines{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px}
+.machine-card{border:1px solid #ccd5db;padding:9px;border-radius:4px}
+.machine-card.selected{border-color:#3477a5;border-left:4px solid #3477a5}
+.machine-card b{font-size:13px}
+.machine-card p{font-size:12px;color:#64737f;margin:6px 0 0}
+.state{float:right;font-size:11px;color:#64737f}
+.controls{display:flex;gap:7px;flex-wrap:wrap;padding:12px;border-top:1px solid #d5dce1}
+button,select{padding:9px 11px;border:1px solid #bac5cc;border-radius:4px;background:white;color:#263440;cursor:pointer}
+button.primary{background:#20394c;color:white;border-color:#20394c}
+button:disabled{opacity:.5;cursor:default}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.stat{padding:10px;background:#f3f6f8;border:1px solid #e0e5e9}
+.stat span{display:block;font-size:11px;color:#64737f}
+.stat strong{font-size:21px;display:block;margin-top:4px}
+.decision{margin:0 12px 12px;background:#f5f8fa;border:1px solid #cbd8e0;padding:12px}
+.decision h3,.log h3{margin:0 0 8px;font-size:13px}
+#chosen{font-size:21px;font-weight:bold;color:#20394c}
+#reason{font-size:12px;color:#586875;margin-top:6px}
+#scores{font-size:12px;margin-top:10px;border-top:1px solid #dce3e8;padding-top:7px}
+.score{display:flex;justify-content:space-between;padding:3px 0;gap:8px}
+.log{padding:0 12px 12px}
+#events{height:125px;overflow:auto;background:#fafbfc;border:1px solid #d5dce1;padding:8px;font:12px/1.5 monospace}
+.event{padding:2px 0;border-bottom:1px solid #edf0f2}
+footer{max-width:1200px;margin:0 auto;padding:0 14px 20px;font-size:11px;color:#687782}
+@media(max-width:760px){main{grid-template-columns:1fr}.machines{grid-template-columns:1fr}header{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <h1>SmartCell | CNC Machine Tending</h1>
+  <span id="runStatus">SIMULATION STOPPED</span>
+</header>
+
+<main>
+<section class="panel">
+  <div class="heading">Factory Cell : Top View</div>
+  <svg viewBox="0 0 700 330" aria-label="Top view of three CNC machines and shared robot">
+    <circle class="reach" cx="350" cy="220" r="185"/>
+    <g transform="translate(45 25)">
+      <rect class="machine" width="140" height="82" rx="3"/>
+      <rect class="door" x="12" y="12" width="78" height="58"/>
+      <line x1="51" y1="12" x2="51" y2="70" stroke="#83929c"/>
+      <circle id="lightA" cx="115" cy="25" r="5" fill="#2f805f"/>
+      <text class="label" x="70" y="101" text-anchor="middle">CNC-A</text>
+      <text id="svgA" class="small" x="70" y="116" text-anchor="middle">Processing</text>
+    </g>
+    <g transform="translate(280 25)">
+      <rect class="machine" width="140" height="82" rx="3"/>
+      <rect class="door" x="12" y="12" width="78" height="58"/>
+      <line x1="51" y1="12" x2="51" y2="70" stroke="#83929c"/>
+      <circle id="lightB" cx="115" cy="25" r="5" fill="#2f805f"/>
+      <text class="label" x="70" y="101" text-anchor="middle">CNC-B</text>
+      <text id="svgB" class="small" x="70" y="116" text-anchor="middle">Processing</text>
+    </g>
+    <g transform="translate(515 25)">
+      <rect class="machine" width="140" height="82" rx="3"/>
+      <rect class="door" x="12" y="12" width="78" height="58"/>
+      <line x1="51" y1="12" x2="51" y2="70" stroke="#83929c"/>
+      <circle id="lightC" cx="115" cy="25" r="5" fill="#2f805f"/>
+      <text class="label" x="70" y="101" text-anchor="middle">CNC-C</text>
+      <text id="svgC" class="small" x="70" y="116" text-anchor="middle">Processing</text>
+    </g>
+
+    <path class="reach" d="M350 220 L115 130 M350 220 L350 130 M350 220 L585 130" opacity=".45"/>
+    <path id="arm1" class="arm" d="M350 235 L350 200"/>
+    <path id="arm2" class="arm" d="M350 200 L350 170"/>
+    <circle id="joint1" class="joint" cx="350" cy="200" r="8"/>
+    <circle id="joint2" class="joint" cx="350" cy="170" r="7"/>
+    <path id="tool" d="M350 170 l-7 -8 M350 170 l7 -8" stroke="#374957" stroke-width="3"/>
+    <rect class="base" x="337" y="231" width="26" height="24" rx="4"/>
+    <ellipse class="base" cx="350" cy="255" rx="29" ry="11"/>
+    <text class="label" x="350" y="281" text-anchor="middle">SHARED ROBOT</text>
+    <text id="robotStatus" class="small" x="350" y="298" text-anchor="middle">Idle</text>
+  </svg>
+
+  <div class="machines">
+    <div class="machine-card" id="cardA">
+      <b>CNC-A</b><span class="state" id="stateA">Processing</span>
+      <p>Cycle 6s · Service 2s</p><p>Wait: <b id="waitA">0s</b></p>
+    </div>
+    <div class="machine-card" id="cardB">
+      <b>CNC-B</b><span class="state" id="stateB">Processing</span>
+      <p>Cycle 7s · Service 3s</p><p>Wait: <b id="waitB">0s</b></p>
+    </div>
+    <div class="machine-card" id="cardC">
+      <b>CNC-C</b><span class="state" id="stateC">Processing</span>
+      <p>Cycle 5s · Service 1s</p><p>Wait: <b id="waitC">0s</b></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="start" class="primary">Start</button>
+    <button id="pause" disabled>Pause</button>
+    <button id="reset">Reset</button>
+    <select id="strategy" aria-label="Dispatch strategy">
+      <option value="smart">SmartCell priority</option>
+      <option value="fixed">Fixed order A → B → C</option>
+    </select>
+    <button id="delay">Inject delay</button>
+  </div>
+</section>
+
+<aside class="panel">
+  <div class="heading">Live status <span id="elapsed" style="float:right;font-weight:normal">0s elapsed</span></div>
+  <div class="stats">
+    <div class="stat"><span>Parts completed</span><strong id="parts">0</strong></div>
+    <div class="stat"><span>Robot services</span><strong id="cycles">0</strong></div>
+    <div class="stat"><span>Longest wait</span><strong id="longest">0s</strong></div>
+    <div class="stat"><span>Robot utilization</span><strong id="util">0%</strong></div>
+  </div>
+
+  <div class="decision">
+    <h3>Dispatch decision</h3>
+    <div id="chosen">No machine selected</div>
+    <div id="reason">Start the simulation to see the next dispatch decision.</div>
+    <div id="scores"></div>
+  </div>
+
+  <div class="log">
+    <h3>Event log</h3>
+    <div id="events"><div class="event">Ready. Press Start.</div></div>
+  </div>
+</aside>
+</main>
+<footer>Simulation only : not connected to real CNC or robot equipment.</footer>
+
+<script>
+"use strict";
+
+const SETTINGS = {
+  A: {cycle:6, service:2, priority:1},
+  B: {cycle:7, service:3, priority:2},
+  C: {cycle:5, service:1, priority:1}
+};
+const ORDER = ["A","B","C"];
+const $ = id => document.getElementById(id);
+
+let machines, running=false, timer=null, elapsed=0;
+let busy=0, services=0, parts=0, active=null;
+let serviceLeft=0, pendingDelay=null, fixedIndex=0;
+
+function resetState() {
+  if (timer) clearInterval(timer);
+  timer=null;
+  running=false;
+  elapsed=0;
+  busy=0;
+  services=0;
+  parts=0;
+  active=null;
+  serviceLeft=0;
+  pendingDelay=null;
+  fixedIndex=0;
+
+  machines={};
+  for (const k of ORDER) {
+    machines[k]={
+      ...SETTINGS[k],
+      remaining:SETTINGS[k].cycle,
+      wait:0,
+      state:"processing"
+    };
+  }
+
+  $("events").innerHTML="";
+  $("start").disabled=false;
+  $("pause").disabled=true;
+  $("runStatus").textContent="SIMULATION STOPPED";
+  $("robotStatus").textContent="Idle";
+  moveArm(null);
+  render();
+  decision(null);
+  log("Simulation reset. Fixed order starts at CNC-A.");
+}
+
+function log(message) {
+  const el=document.createElement("div");
+  el.className="event";
+  el.textContent=String(elapsed).padStart(3,"0")+"s  "+message;
+  $("events").prepend(el);
+  while ($("events").children.length>22) {
+    $("events").lastChild.remove();
+  }
+}
+
+function eligible() {
+  return ORDER.filter(k=>machines[k].state==="ready");
+}
+
+function score(k) {
+  return machines[k].wait*1.5 + machines[k].priority*4;
+}
+
+function choose() {
+  const ready=eligible();
+  if (!ready.length) return null;
+
+  if ($("strategy").value==="fixed") {
+    // STRICT A -> B -> C order. Do not skip the expected machine.
+    const expected=ORDER[fixedIndex];
+    return ready.includes(expected) ? expected : null;
+  }
+
+  // SmartCell mode: highest score among machines ready now.
+  return [...ready].sort(
+    (a,b)=>score(b)-score(a) || a.localeCompare(b)
+  )[0];
+}
+
+function decision(k) {
+  const fixed=$("strategy").value==="fixed";
+
+  if (!k) {
+    $("chosen").textContent="Robot waiting";
+    if (fixed) {
+      const expected=ORDER[fixedIndex];
+      $("reason").textContent="Fixed sequence expects CNC-"+expected+
+        ". The robot waits until that machine is ready.";
+    } else {
+      $("reason").textContent=
+        "No CNC is ready, or the robot is finishing its current service.";
+    }
+    $("scores").innerHTML="";
+    if (fixed) {
+      const row=document.createElement("div");
+      row.className="score";
+      row.textContent="Next in sequence: CNC-"+ORDER[fixedIndex];
+      $("scores").appendChild(row);
+    }
+    return;
+  }
+
+  $("chosen").textContent="CNC-"+k;
+  $("reason").textContent=fixed
+    ?"Selected because CNC-"+k+" is next in the strict A → B → C sequence."
+    :"Selected because it has the highest wait/priority score among ready machines.";
+
+  $("scores").innerHTML="";
+  const candidates=fixed ? [ORDER[fixedIndex]] : eligible();
+
+  candidates.forEach(j=>{
+    const row=document.createElement("div");
+    row.className="score";
+    const left=document.createElement("span");
+    left.textContent="CNC-"+j+" · wait "+machines[j].wait+"s";
+    const right=document.createElement("b");
+    right.textContent=fixed ? "Next in order" : "Score "+score(j).toFixed(1);
+    row.append(left,right);
+    $("scores").appendChild(row);
+  });
+}
+
+function moveArm(k) {
+  const targets={
+    A:{x:115,y:130},
+    B:{x:350,y:130},
+    C:{x:585,y:130}
+  };
+  const t=k ? targets[k] : {x:350,y:170};
+  const bx=350, by=235;
+  const ex=bx+(t.x-bx)*.52;
+  const ey=by+(t.y-by)*.48;
+
+  $("arm1").setAttribute("d",`M${bx} ${by} L${ex} ${ey}`);
+  $("arm2").setAttribute("d",`M${ex} ${ey} L${t.x} ${t.y}`);
+  $("joint1").setAttribute("cx",ex);
+  $("joint1").setAttribute("cy",ey);
+  $("joint2").setAttribute("cx",t.x);
+  $("joint2").setAttribute("cy",t.y);
+  $("tool").setAttribute(
+    "d",`M${t.x} ${t.y} l-7 -8 M${t.x} ${t.y} l7 -8`
+  );
+}
+
+function startService(k) {
+  active=k;
+  machines[k].state="servicing";
+  machines[k].wait=0;
+
+  // Hard cap: no robot service can exceed 3 simulated seconds.
+  serviceLeft=Math.min(3,machines[k].service);
+  services++;
+
+  moveArm(k);
+  $("robotStatus").textContent="Servicing CNC-"+k;
+  decision(k);
+  log("Robot dispatched to CNC-"+k+" for "+serviceLeft+"s.");
+}
+
+function tick() {
+  elapsed++;
+
+  // Advance CNC cycles independently of robot service.
+  for (const k of ORDER) {
+    const m=machines[k];
+
+    if (m.state==="processing") {
+      m.remaining--;
+
+      if (m.remaining<=0) {
+        if (pendingDelay===k) {
+          pendingDelay=null;
+          m.state="delayed";
+          m.remaining=3;
+          log("CNC-"+k+" received an extra 3-second delay.");
+        } else {
+          m.state="ready";
+          m.wait=0;
+          log("CNC-"+k+" is ready for robot service.");
+        }
+      }
+    } else if (m.state==="delayed") {
+      m.remaining--;
+      if (m.remaining<=0) {
+        m.state="ready";
+        m.wait=0;
+        log("CNC-"+k+" delay cleared; machine is ready.");
+      }
+    } else if (m.state==="ready") {
+      m.wait++;
+    }
+  }
+
+  if (active!==null) {
+    busy++;
+    serviceLeft--;
+
+    if (serviceLeft<=0) {
+      const completed=active;
+      parts++;
+      machines[completed].state="processing";
+      machines[completed].remaining=machines[completed].cycle;
+
+      // Advance fixed order only after the machine was serviced.
+      // Changing modes does not cause a random selection.
+      if ($("strategy").value==="fixed") {
+        fixedIndex=(ORDER.indexOf(completed)+1)%ORDER.length;
+      }
+
+      log("CNC-"+completed+" serviced; machining cycle restarted.");
+
+      active=null;
+      moveArm(null);
+      $("robotStatus").textContent="Returning to center";
+    }
+  } else {
+    const next=choose();
+    if (next!==null) {
+      startService(next);
+    } else {
+      decision(null);
+      if ($("strategy").value==="fixed") {
+        $("robotStatus").textContent=
+          "Waiting for CNC-"+ORDER[fixedIndex];
+      } else {
+        $("robotStatus").textContent="Waiting for ready machine";
+      }
+    }
+  }
+
+  render();
+}
+
+function render() {
+  const names={
+    processing:"Processing",
+    ready:"Ready / waiting",
+    servicing:"Robot servicing",
+    delayed:"Delayed"
+  };
+
+  for (const k of ORDER) {
+    const m=machines[k];
+    const label=names[m.state];
+
+    $("state"+k).textContent=label;
+    $("svg"+k).textContent=label;
+    $("wait"+k).textContent=m.wait+"s";
+    $("card"+k).classList.toggle("selected",m.state==="servicing");
+
+    const color=
+      m.state==="ready" || m.state==="delayed" ? "#c18a2b" :
+      m.state==="servicing" ? "#3477a5" : "#2f805f";
+
+    $("light"+k).setAttribute("fill",color);
+  }
+
+  $("parts").textContent=parts;
+  $("cycles").textContent=services;
+  $("longest").textContent=
+    Math.max(...ORDER.map(k=>machines[k].wait))+"s";
+  $("util").textContent=(elapsed ? Math.round(busy/elapsed*100) : 0)+"%";
+  $("elapsed").textContent=elapsed+"s elapsed";
+}
+
+$("start").addEventListener("click",()=>{
+  if (running) return;
+  running=true;
+  $("start").disabled=true;
+  $("pause").disabled=false;
+  $("runStatus").textContent="SIMULATION RUNNING";
+  timer=setInterval(tick,650);
+  log("Simulation started.");
+});
+
+$("pause").addEventListener("click",()=>{
+  if (timer) clearInterval(timer);
+  timer=null;
+  running=false;
+  $("start").disabled=false;
+  $("pause").disabled=true;
+  $("runStatus").textContent="SIMULATION PAUSED";
+  log("Simulation paused.");
+});
+
+$("reset").addEventListener("click",resetState);
+
+$("strategy").addEventListener("change",()=>{
+  decision(choose());
+  log("Dispatch mode changed to "+$("strategy").selectedOptions[0].text+".");
+});
+
+$("delay").addEventListener("click",()=>{
+  if (!running) {
+    log("Start the simulation before injecting a delay.");
+    return;
+  }
+
+  const candidates=ORDER.filter(k=>
+    machines[k].state==="processing" && pendingDelay!==k
+  );
+
+  if (!candidates.length) {
+    log("No processing machine available for a delay right now.");
+    return;
+  }
+
+  // Delay the processing CNC with the shortest remaining cycle.
+  candidates.sort((a,b)=>machines[a].remaining-machines[b].remaining);
+  const k=candidates[0];
+  pendingDelay=k;
+
+  log("Delay scheduled for CNC-"+k+
+      ": adds 3 seconds after its current cycle finishes.");
+});
+
+resetState();
+</script>
+</body>
+</html>
